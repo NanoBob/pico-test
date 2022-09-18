@@ -2,37 +2,45 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 #include "hardware/gpio.h"
+#include "hardware/pwm.h"
 #include "reboot/bootsel-reboot.h"
 
-const uint LED_PIN = 13;
+const uint ledPin = 13;
+const uint pwmPin = 28;
 
-void blinkPico() {
-    gpio_init(LED_PIN) ;
-    gpio_set_dir(LED_PIN, GPIO_OUT) ;
+void blinkLight(uint millisecondsOn) {
+    check_bootsel_button();
 
-    while(true) {
-		check_bootsel_button();
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+    sleep_ms(millisecondsOn);
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
 
-        gpio_put(LED_PIN, 0) ;
-        sleep_ms(250) ;
-        gpio_put(LED_PIN, 1);
-        sleep_ms(1000) ;
-    }
+    check_bootsel_button();
 }
 
-void blinkPicoW() {
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-    sleep_ms(2500);
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-    sleep_ms(1000);
-
+void blink() {
     while (true) {
 		check_bootsel_button();
 
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        blinkLight(250);
+        sleep_ms(500);
+		check_bootsel_button();
+    }
+}
+
+void pwmLoop() {
+    gpio_set_function(pwmPin, GPIO_FUNC_PWM);
+    uint pwmSlice = pwm_gpio_to_slice_num(pwmPin);
+
+    pwm_set_wrap(pwmSlice, 50);
+    pwm_set_enabled(pwmSlice, true);
+
+    for (int i = 0; i < 50; i++) {
+		check_bootsel_button();
+        blinkLight(5);
+        pwm_set_chan_level(pwmSlice, PWM_CHAN_A, i);
+        // pwm_set_enabled(pwmSlice, true);
         sleep_ms(250);
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-        sleep_ms(1000) ;
     }
 }
 
@@ -41,10 +49,11 @@ int main() {
     arm_watchdog();
 
     if (cyw43_arch_init()) {
-        blinkPico();
         return -1;
     }
-    blinkPicoW();
+
+    pwmLoop();
+    // blink();
 
     return 0;
 }
